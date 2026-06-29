@@ -59,8 +59,6 @@ async function fetchImageAsBase64(url) {
 }
 
 // ---------------- Dropbox ----------------
-let dropboxRootNamespace = null; // cached path-root for personal/team accounts
-
 async function dropboxAccessToken() {
   const body = new URLSearchParams({
     grant_type: "refresh_token",
@@ -77,24 +75,11 @@ async function dropboxAccessToken() {
   return (await r.json()).access_token;
 }
 
-async function dropboxRootHeader(accessToken) {
-  if (dropboxRootNamespace) return dropboxRootNamespace;
-  const r = await fetch("https://api.dropboxapi.com/2/users/get_current_account", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (r.ok) {
-    const acct = await r.json();
-    const ns = acct?.root_info?.root_namespace_id;
-    if (ns) dropboxRootNamespace = JSON.stringify({ ".tag": "root", root: ns });
-  }
-  return dropboxRootNamespace;
-}
-
 // Upload bytes and return { path, link } (link is a direct-download URL). Best-effort.
+// Note: we intentionally do NOT set Dropbox-API-Path-Root, so writes go to the
+// member's default (home) namespace — the correct, writable location on Business accounts.
 async function uploadToDropbox(buffer, filename) {
   const token = await dropboxAccessToken();
-  const pathRoot = await dropboxRootHeader(token);
   const dest = `${DROPBOX_DEST_PATH}/${filename}`;
 
   const headers = {
@@ -102,7 +87,6 @@ async function uploadToDropbox(buffer, filename) {
     "Content-Type": "application/octet-stream",
     "Dropbox-API-Arg": JSON.stringify({ path: dest, mode: "add", autorename: true, mute: true }),
   };
-  if (pathRoot) headers["Dropbox-API-Path-Root"] = pathRoot;
 
   const up = await fetch("https://content.dropboxapi.com/2/files/upload", {
     method: "POST",
@@ -117,7 +101,6 @@ async function uploadToDropbox(buffer, filename) {
   let link = null;
   try {
     const linkHeaders = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-    if (pathRoot) linkHeaders["Dropbox-API-Path-Root"] = pathRoot;
     const lr = await fetch("https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings", {
       method: "POST",
       headers: linkHeaders,
@@ -346,7 +329,7 @@ app.get("/openapi.json", (req, res) => {
 
 app.get("/", (_req, res) => res.send("nano-banana remote MCP is running. POST /mcp"));
 app.get("/health", (_req, res) =>
-  res.json({ ok: true, model: MODEL, build: "chatgpt-v1", dropbox: DROPBOX_ENABLED })
+  res.json({ ok: true, model: MODEL, build: "dropbox-v2", dropbox: DROPBOX_ENABLED })
 );
 
 app.post(["/mcp", "/mcp/:token"], async (req, res) => {
