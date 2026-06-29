@@ -168,6 +168,26 @@ async function buildContent(images, prefix) {
   return content;
 }
 
+// ---------------- In-memory image hosting (for ChatGPT Action image URLs) ----------------
+const imageStore = new Map(); // id -> { buf, mimeType, at }
+const IMAGE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const IMAGE_MAX = 200;
+
+function hostImage(buf, mimeType) {
+  const id = Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 6);
+  imageStore.set(id, { buf, mimeType: mimeType || "image/png", at: Date.now() });
+  // Evict oldest / expired.
+  for (const [k, v] of imageStore) {
+    if (Date.now() - v.at > IMAGE_TTL_MS) imageStore.delete(k);
+  }
+  while (imageStore.size > IMAGE_MAX) {
+    const oldest = [...imageStore.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+    if (!oldest) break;
+    imageStore.delete(oldest[0]);
+  }
+  return id;
+}
+
 // ---- Build an MCP server instance with the tools ----
 function buildServer() {
   const server = new McpServer({ name: "nano-banana-remote", version: "1.1.0" });
@@ -214,19 +234,119 @@ function buildServer() {
 
 // ---- HTTP layer (stateless Streamable HTTP) ----
 const app = express();
+app.set("trust proxy", true); // so req.protocol reflects https behind Render's proxy
 app.use(express.json({ limit: "30mb" }));
 
 function authorized(req) {
   if (!AUTH_TOKEN) return true;
   const fromHeader = (req.headers["authorization"] || "") === `Bearer ${AUTH_TOKEN}`;
+  const fromApiKey = (req.headers["x-api-key"] || "") === AUTH_TOKEN;
   const fromPath = req.params.token === AUTH_TOKEN;
   const fromQuery = req.query.t === AUTH_TOKEN;
-  return fromHeader || fromPath || fromQuery;
+  return fromHeader || fromApiKey || fromPath || fromQuery;
 }
+
+function publicBaseUrl(req) {
+  if (process.env.RENDER_EXTERNAL_URL) return process.env.RENDER_EXTERNAL_URL.replace(/\/+$/, "");
+  return `${req.protocol}://${req.get("host")}`;
+}
+
+// Serve a hosted image by id (public; ids are unguessable).
+app.get("/images/:id", (req, res) => {
+  const key = req.params.id.replace(/\.[a-z0-9]+$/i, ""); // tolerate a .png/.jpg suffix
+  const item = imageStore.get(key);
+  if (!item) return res.status(404).send("Not found");
+  res.set("Content-Type", item.mimeType);
+  res.set("Cache-Control", "public, max-age=86400");
+  res.send(item.buf);
+});
+
+// ---- REST API for ChatGPT Custom GPT Actions ----
+async function restImageResponse(req, res, images, prefix) {
+  const first = images[0];
+  const buf = Buffer.from(first.base64, "base64");
+  const id = hostImage(buf, first.mimeType);
+  const ext = (first.mimeType && first.mimeType.split("/")[1]) || "png";
+  const out = { image_url: `${publicBaseUrl(req)}/images/${id}.${ext}` };
+  if (DROPBOX_ENABLED) {
+    try {
+      const { path, link } = await uploadToDropbox(buf, tsName(prefix, first.mimeType));
+      out.dropbox_path = path;
+      if (link) out.dropbox_link = link;
+    } catch (e) {
+      out.dropbox_error = String(e.message).slice(0, 200);
+    }
+  }
+  res.json(out);
+}
+
+app.post("/api/generate", async (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const prompt = req.body?.prompt;
+    if (!prompt) return res.status(400).json({ error: "Missing 'prompt'" });
+    const images = await callGemini([{ text: prompt }]);
+    await restImageResponse(req, res, images, "generated");
+  } catch (e) {
+    res.status(500).json({ error: String(e.message).slice(0, 400) });
+  }
+});
+
+app.post("/api/edit", async (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const { imageUrl, prompt } = req.body || {};
+    if (!imageUrl || !prompt) return res.status(400).json({ error: "Missing 'imageUrl' or 'prompt'" });
+    const src = await fetchImageAsBase64(imageUrl);
+    const images = await callGemini([
+      { text: prompt },
+      { inline_data: { mime_type: src.mimeType, data: src.base64 } },
+    ]);
+    await restImageResponse(req, res, images, "edited");
+  } catch (e) {
+    res.status(500).json({ error: String(e.message).slice(0, 400) });
+  }
+});
+
+// Self-describing OpenAPI spec for the Custom GPT builder.
+app.get("/openapi.json", (req, res) => {
+  const base = publicBaseUrl(req);
+  res.json({
+    openapi: "3.1.0",
+    info: { title: "Nano Banana Image Generator", version: "1.0.0", description: "Generate and edit images with Gemini." },
+    servers: [{ url: base }],
+    components: { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer" } } },
+    security: [{ bearerAuth: [] }],
+    paths: {
+      "/api/generate": {
+        post: {
+          operationId: "generateImage",
+          summary: "Generate a new image from a text prompt. Returns image_url.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["prompt"], properties: { prompt: { type: "string", description: "Detailed description of the image" } } } } },
+          },
+          responses: { "200": { description: "Generated image", content: { "application/json": { schema: { type: "object", properties: { image_url: { type: "string" }, dropbox_path: { type: "string" }, dropbox_link: { type: "string" } } } } } } },
+        },
+      },
+      "/api/edit": {
+        post: {
+          operationId: "editImage",
+          summary: "Edit an existing image (given a public URL) with instructions. Returns image_url.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object", required: ["imageUrl", "prompt"], properties: { imageUrl: { type: "string", description: "Public URL of the source image" }, prompt: { type: "string", description: "What to change" } } } } },
+          },
+          responses: { "200": { description: "Edited image", content: { "application/json": { schema: { type: "object", properties: { image_url: { type: "string" }, dropbox_path: { type: "string" }, dropbox_link: { type: "string" } } } } } } },
+        },
+      },
+    },
+  });
+});
 
 app.get("/", (_req, res) => res.send("nano-banana remote MCP is running. POST /mcp"));
 app.get("/health", (_req, res) =>
-  res.json({ ok: true, model: MODEL, build: "dropbox-v1", dropbox: DROPBOX_ENABLED })
+  res.json({ ok: true, model: MODEL, build: "chatgpt-v1", dropbox: DROPBOX_ENABLED })
 );
 
 app.post(["/mcp", "/mcp/:token"], async (req, res) => {
