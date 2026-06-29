@@ -14,3 +14,12 @@ services:
         sync: false
       - key: GEMINI_IMAGE_MODEL
         value: gemini-2.5-flash-image
+      # Dropbox (optional) — set these to auto-save generated images to Dropbox
+      - key: DROPBOX_APP_KEY
+        sync: false
+      - key: DROPBOX_APP_SECRET
+        sync: false
+      - key: DROPBOX_REFRESH_TOKEN
+        sync: false
+      - key: DROPBOX_DEST_PATH
+        value: /Pictures/Nano Banana
