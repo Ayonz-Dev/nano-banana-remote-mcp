@@ -1,0 +1,16 @@
+# Render.com blueprint — one-click-ish deploy.
+# After connecting the repo, set GEMINI_API_KEY and MCP_AUTH_TOKEN as secrets in the dashboard.
+services:
+  - type: web
+    name: nano-banana-remote-mcp
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MCP_AUTH_TOKEN
+        sync: false
+      - key: GEMINI_IMAGE_MODEL
+        value: gemini-2.5-flash-image
