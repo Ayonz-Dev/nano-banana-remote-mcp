@@ -115,7 +115,7 @@ function authorized(req) {
 }
 
 app.get("/", (_req, res) => res.send("nano-banana remote MCP is running. POST /mcp"));
-app.get("/health", (_req, res) => res.json({ ok: true, model: MODEL }));
+app.get("/health", (_req, res) => res.json({ ok: true, model: MODEL, build: "path-auth-v2" }));
 
 app.post(["/mcp", "/mcp/:token"], async (req, res) => {
   if (!authorized(req)) {
