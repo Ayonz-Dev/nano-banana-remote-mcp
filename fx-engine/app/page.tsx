@@ -1,16 +1,28 @@
 import { KpiCard } from '../components/KpiCard';
 import { ScenarioSwitcher } from '../components/ScenarioSwitcher';
 import { CoveragePairTable } from '../components/CoveragePairTable';
+import { RateChart } from '../components/RateChart';
 import { isSupabaseConfigured } from '../lib/supabase/server';
-import { fetchCash, fetchCoverage, fetchScenarios } from '../lib/supabase/queries';
+import {
+  fetchCash,
+  fetchCoverage,
+  fetchScenarios,
+  fetchSpotHistory,
+  fetchBankForecasts,
+  fetchForwards,
+  fetchRateAssumptions,
+} from '../lib/supabase/queries';
 import {
   rollupCoverage,
   totalCashUsd,
   bufferCoverageRatio,
 } from '../lib/coverage/rollup';
+import { ratesForPair } from '../lib/irp/irp';
 import { formatPercent, formatUsd } from '../lib/format';
 
 export const dynamic = 'force-dynamic';
+
+const CHART_PAIR = 'AUD/USD';
 
 function parseScenario(raw: string | string[] | undefined): number | null {
   const value = Array.isArray(raw) ? raw[0] : raw;
@@ -50,15 +62,29 @@ export default async function DashboardPage({
     );
   }
 
-  const [scenarios, coverage, cash] = await Promise.all([
-    fetchScenarios(),
-    fetchCoverage(scenarioId),
-    fetchCash(scenarioId),
-  ]);
+  const [scenarios, coverage, cash, spotHistory, bankForecasts, forwards, rateMap] =
+    await Promise.all([
+      fetchScenarios(),
+      fetchCoverage(scenarioId),
+      fetchCash(scenarioId),
+      fetchSpotHistory(CHART_PAIR),
+      fetchBankForecasts(CHART_PAIR),
+      fetchForwards(scenarioId, CHART_PAIR),
+      fetchRateAssumptions(),
+    ]);
 
   const rollup = rollupCoverage(coverage);
   const cashUsd = totalCashUsd(cash);
   const buffer = bufferCoverageRatio(cashUsd, rollup.unhedgedPayableUsd);
+
+  // Resolve base and quote rates for the IRP line. If an assumption is missing,
+  // skip the chart rather than mispricing it.
+  let chartRates: { rateBase: number; rateQuote: number } | null = null;
+  try {
+    chartRates = ratesForPair(CHART_PAIR, rateMap);
+  } catch {
+    chartRates = null;
+  }
 
   return (
     <main className="page">
@@ -98,6 +124,23 @@ export default async function DashboardPage({
           }
         />
       </section>
+
+      <h2 className="section-title">{CHART_PAIR} spot, predictions and forwards</h2>
+      {chartRates ? (
+        <RateChart
+          pair={CHART_PAIR}
+          spotHistory={spotHistory}
+          bankForecasts={bankForecasts}
+          forwards={forwards}
+          rateBase={chartRates.rateBase}
+          rateQuote={chartRates.rateQuote}
+        />
+      ) : (
+        <p className="empty">
+          No rate assumptions for {CHART_PAIR}. Seed <code>rate_assumptions</code> to draw the IRP
+          line.
+        </p>
+      )}
 
       <h2 className="section-title">Monthly coverage by pair</h2>
       <CoveragePairTable rows={coverage} />

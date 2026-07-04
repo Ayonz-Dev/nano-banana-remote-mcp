@@ -1,6 +1,7 @@
 import 'server-only';
 import { getServerClient } from './server';
 import type { CashRow, CoverageRow, Scenario } from '../coverage/types';
+import type { ForecastPoint, ForwardPoint, SpotPoint } from '../chart/series';
 
 // Data access for the dashboard. All numeric columns come back from supabase-js
 // as strings to preserve precision, so every fetch coerces them to numbers here,
@@ -83,4 +84,66 @@ export async function fetchCash(scenarioId: number | null): Promise<CashRow[]> {
     as_of_date: row.as_of_date as string,
     scenario_id: (row.scenario_id as number | null) ?? null,
   }));
+}
+
+export async function fetchSpotHistory(pair: string): Promise<SpotPoint[]> {
+  const client = getServerClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('spot_history')
+    .select('date, rate')
+    .eq('pair', pair)
+    .order('date', { ascending: true });
+  if (error) throw new Error(`fetchSpotHistory: ${error.message}`);
+  return (data ?? []).map((row) => ({ date: row.date as string, rate: num(row.rate) }));
+}
+
+export async function fetchBankForecasts(pair: string): Promise<ForecastPoint[]> {
+  const client = getServerClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('bank_forecasts')
+    .select('target_date, rate')
+    .eq('pair', pair)
+    .order('target_date', { ascending: true });
+  if (error) throw new Error(`fetchBankForecasts: ${error.message}`);
+  return (data ?? []).map((row) => ({ date: row.target_date as string, rate: num(row.rate) }));
+}
+
+/** Live or scenario forwards for a pair, retired rows excluded, as scatter points. */
+export async function fetchForwards(
+  scenarioId: number | null,
+  pair: string,
+): Promise<ForwardPoint[]> {
+  const client = getServerClient();
+  if (!client) return [];
+  const { data, error } = await scopeToScenario(
+    client
+      .from('forward_orders')
+      .select('order_number, contract_rate, maturity_date, pair, retired_at')
+      .eq('pair', pair)
+      .is('retired_at', null),
+    scenarioId,
+  ).order('maturity_date', { ascending: true });
+  if (error) throw new Error(`fetchForwards: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    date: row.maturity_date as string,
+    rate: num(row.contract_rate),
+    orderNumber: row.order_number as string,
+  }));
+}
+
+/** Latest annualised rate per currency, as a lookup for the IRP line. */
+export async function fetchRateAssumptions(): Promise<Record<string, number>> {
+  const client = getServerClient();
+  if (!client) return {};
+  const { data, error } = await client
+    .from('v_rate_assumptions_latest')
+    .select('currency, annual_rate');
+  if (error) throw new Error(`fetchRateAssumptions: ${error.message}`);
+  const map: Record<string, number> = {};
+  for (const row of data ?? []) {
+    map[row.currency as string] = num(row.annual_rate);
+  }
+  return map;
 }

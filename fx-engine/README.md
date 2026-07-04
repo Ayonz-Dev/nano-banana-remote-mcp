@@ -62,6 +62,25 @@ it reads `v_rate_assumptions_latest` and passes the rates in.
 - Without Supabase env vars the page renders a configuration notice, so the
   build and dev server run with no database.
 
+### Rate chart (Recharts)
+
+- `components/RateChart.tsx` is a client component: the historical spot line,
+  the three predictive lines, and forward-order dots on a shared numeric time
+  axis, with a slider for the manual line.
+- `lib/chart/series.ts` builds the model as a pure, unit-tested unit. Every
+  predictive line is anchored on the last actual spot so they converge there.
+- The three predictive lines carry different epistemic status and get distinct
+  dash styles and legend labels so they do not read as equally authoritative:
+  IRP (arbitrage-free, clean dash), bank forecast (opinion, sparse dot), manual
+  (what-if, dash-dot).
+- Manual slider behaviour: it shifts the endpoint rate at the far horizon and
+  interpolates linearly back to the anchor spot, rather than a flat drift.
+- IRP rates come from `rate_assumptions` via `ratesForPair`. The default pair is
+  AUD/USD.
+- `app/chart-preview` renders the chart from deterministic synthetic data, so it
+  can be viewed and screenshotted without a database. It is not linked from the
+  app.
+
 ## Verify
 
 ```bash
@@ -84,8 +103,8 @@ coverage.
 
 ## Next increments (not built yet)
 
-- Recharts chart: spot history, the three predictive lines (IRP, bank forecast,
-  manual slider) with distinct dash styles and a clear legend, and forward-order
-  dots at maturity.
-- Manual slider behaviour and the forward move UX are still open decisions in
-  the brief.
+- Forward move UX: dragging or clicking a forward to change its maturity, which
+  forks a live forward into a scenario before moving the copy. The chart plots
+  forwards read-only for now; this adds the write path.
+- Multi-pair chart selection (the chart defaults to AUD/USD).
+- buy_sell backfill from MYOB so forwards count toward buy or sell coverage.

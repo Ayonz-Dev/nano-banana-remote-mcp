@@ -164,3 +164,44 @@ body {
 .notice code {
   color: var(--accent);
 }
+
+.rate-chart {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.rate-chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.rate-chart-controls strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.rate-chart-controls input[type='range'] {
+  flex: 1 1 220px;
+  max-width: 360px;
+  accent-color: var(--manual, #f472b6);
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
