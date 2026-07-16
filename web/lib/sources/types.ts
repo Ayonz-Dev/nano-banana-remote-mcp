@@ -24,6 +24,19 @@ export interface Series {
   year?: number;
   /** The data rows. */
   points: DataPoint[];
+  /**
+   * Whether the metric is additive/extensive (money, people, counts) — i.e.
+   * summing rows into a total is meaningful. Intensive metrics (rates, %,
+   * per-capita, life expectancy) are not additive. Drives which story angles
+   * apply. When omitted, the angle layer infers it from the unit.
+   */
+  additive?: boolean;
+  /**
+   * True when the series is one entity measured over time (a trend), rather
+   * than many entities compared at one moment. Drives time-based story angles
+   * and line rendering instead of country rankings.
+   */
+  temporal?: boolean;
   /** True when served from bundled fixtures because live fetch was unavailable. */
   fromFixture?: boolean;
 }
@@ -31,8 +44,10 @@ export interface Series {
 export interface CatalogEntry {
   /** Stable slug used in the UI + API. */
   id: string;
-  /** Display name. */
+  /** Marketing card title shown in the topic picker, e.g. "Biggest economies". */
   title: string;
+  /** The real metric name used on the chart, e.g. "GDP (current US$)". */
+  metric: string;
   /** One-line description of what it shows. */
   blurb: string;
   /** Broad topic used for grouping/filtering. */
@@ -45,6 +60,8 @@ export interface CatalogEntry {
   defaultChart: "rankedBar" | "line";
   /** Suggested unit for display. */
   unit?: string;
+  /** Whether the metric is additive (see Series.additive). */
+  additive?: boolean;
 }
 
 export type Topic =
@@ -55,7 +72,7 @@ export type Topic =
   | "Health"
   | "Energy";
 
-export type SourceId = "worldbank";
+export type SourceId = "worldbank" | "owid" | "oecd" | "fred";
 
 export interface SourceAdapter {
   id: SourceId;

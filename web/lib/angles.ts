@@ -22,12 +22,21 @@ const clampTop = (n: number, len: number) => Math.max(2, Math.min(n, len));
 
 // "Additive" (extensive) metrics can be summed into a meaningful total — money,
 // people, counts. "Intensive" metrics (per-capita rates, percentages, years of
-// life expectancy) cannot, so share-of-total framings don't apply to them.
-function isAdditive(unit?: string): boolean {
+// life expectancy) cannot, so share-of-total framings don't apply to them. The
+// series can state this explicitly; otherwise we infer from the unit.
+function isAdditive(series: Series): boolean {
+  if (typeof series.additive === "boolean") return series.additive;
+  const unit = series.unit;
   return unit === "US$" || unit === "$" || unit === "people";
 }
 
 export function findAngles(series: Series): Angle[] {
+  if (series.temporal) return temporalAngles(series);
+  return rankingAngles(series);
+}
+
+// Angles for cross-sectional data: many entities compared at one moment.
+function rankingAngles(series: Series): Angle[] {
   const pts = [...series.points].sort((a, b) => b.value - a.value);
   if (pts.length < 2) return [];
 
@@ -64,7 +73,7 @@ export function findAngles(series: Series): Angle[] {
   const topN = clampTop(5, pts.length);
   const topSum = pts.slice(0, topN).reduce((s, p) => s + p.value, 0);
   const total = pts.reduce((s, p) => s + p.value, 0);
-  if (isAdditive(unit) && total > 0) {
+  if (isAdditive(series) && total > 0) {
     const share = Math.round((topSum / total) * 100);
     if (share >= 40) {
       angles.push({
@@ -91,12 +100,84 @@ export function findAngles(series: Series): Angle[] {
   return angles;
 }
 
-// A compact noun phrase for the metric, derived from the series title.
+// Angles for a time series: one entity measured over many periods. Frames the
+// story around change, peaks and where things stand now — never rankings.
+function temporalAngles(series: Series): Angle[] {
+  const pts = [...series.points].sort((a, b) => (a.year ?? 0) - (b.year ?? 0));
+  if (pts.length < 2) return [];
+
+  const unit = series.unit;
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  const peak = pts.reduce((m, p) => (p.value > m.value ? p : m), pts[0]);
+  const trough = pts.reduce((m, p) => (p.value < m.value ? p : m), pts[0]);
+  const metric = cap(shortTitle(series));
+  const rows = pts.length;
+
+  const delta = last.value - first.value;
+  const pct = first.value !== 0 ? (delta / Math.abs(first.value)) * 100 : 0;
+  const dir = delta >= 0 ? "up" : "down";
+  const years = (last.year ?? 0) - (first.year ?? 0);
+  // For a metric that is already a rate (%), a relative "% change" is
+  // misleading — express the move in percentage points instead.
+  const changeText =
+    unit === "%"
+      ? `${dir} ${Math.abs(delta).toFixed(1)} points`
+      : `a ${dir === "up" ? "rise" : "fall"} of ${Math.abs(pct).toFixed(0)}%`;
+
+  const angles: Angle[] = [
+    {
+      id: "now",
+      label: "Where it stands",
+      headline: `${metric} now: ${formatValue(last.value, unit)}`,
+      detail: `As of ${last.year}, ${metric.toLowerCase()} is ${formatValue(
+        last.value,
+        unit,
+      )} — ${dir} from ${formatValue(first.value, unit)} in ${first.year}.`,
+      topN: rows,
+    },
+    {
+      id: "change",
+      label: "The change",
+      headline: `${metric}: ${formatValue(first.value, unit)} → ${formatValue(
+        last.value,
+        unit,
+      )} since ${first.year}`,
+      detail: `That's ${changeText} over ${years} years.`,
+      topN: rows,
+    },
+    {
+      id: "peak",
+      label: "The peak",
+      headline: `${metric} peaked at ${formatValue(peak.value, unit)} in ${peak.year}`,
+      detail: `The high was ${formatValue(peak.value, unit)} (${peak.year}); the low was ${formatValue(
+        trough.value,
+        unit,
+      )} (${trough.year}).`,
+      topN: rows,
+    },
+  ];
+  return angles;
+}
+
+const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+
+// A compact noun phrase for the metric, derived from the series title. Order
+// matters: check the specific terms before generic ones (e.g. "R&D (% of GDP)"
+// must match R&D, not GDP).
 export function shortTitle(series: Series): string {
   const t = series.title.toLowerCase();
-  if (t.includes("gdp")) return "GDP";
+  if (t.includes("r&d") || t.includes("research")) return "R&D spending";
+  if (t.includes("unemployment")) return "unemployment";
+  if (t.includes("inflation")) return "inflation";
+  if (t.includes("wind") || t.includes("solar") || t.includes("renewable")) {
+    return "wind & solar power";
+  }
   if (t.includes("population")) return "population";
-  if (t.includes("co₂") || t.includes("co2")) return "CO₂ per person";
+  if (t.includes("co₂") || t.includes("co2")) {
+    return t.includes("per capita") ? "CO₂ per person" : "CO₂ emissions";
+  }
   if (t.includes("life expectancy")) return "life expectancy";
+  if (t.includes("gdp")) return "GDP";
   return series.title;
 }

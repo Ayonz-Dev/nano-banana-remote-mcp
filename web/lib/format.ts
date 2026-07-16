@@ -25,9 +25,12 @@ export function compact(value: number): string {
   return value.toFixed(2);
 }
 
+// Trim a trailing ".0" so "61.0%" reads as "61%" but "3.6%" stays "3.6%".
+const trim = (n: number, digits = 1) => `${+n.toFixed(digits)}`;
+
 export function formatValue(value: number, unit?: string): string {
   if (unit === "US$" || unit === "$") return `$${compact(value)}`;
-  if (unit === "%") return `${value.toFixed(1)}%`;
+  if (unit === "%") return `${trim(value)}%`;
   if (unit === "people") return compact(value);
   const compacted = compact(value);
   return unit ? `${compacted} ${unit}` : compacted;
@@ -36,25 +39,31 @@ export function formatValue(value: number, unit?: string): string {
 // Axis labels want just the scaled number (unit lives in the title).
 export function formatAxis(value: number, unit?: string): string {
   if (unit === "US$" || unit === "$") return `$${compact(value)}`;
+  if (unit === "%") return `${trim(value)}%`;
   return compact(value);
 }
 
 export function subtitleFor(series: Series): string {
   const parts: string[] = [];
   if (series.year) parts.push(String(series.year));
-  if (series.unit && series.unit !== "people") parts.push(unitLabel(series.unit));
+  const label = unitLabel(series.unit);
+  if (label) parts.push(label);
   return parts.join(" · ");
 }
 
-function unitLabel(unit: string): string {
+// Human descriptor for a unit, used in the chart subtitle. Returns "" for units
+// that already read clearly on the axis (%, plain counts) to avoid noise.
+function unitLabel(unit?: string): string {
   switch (unit) {
     case "US$":
       return "current US$";
     case "t":
       return "tonnes per capita";
+    case "Gt CO₂":
+      return "gigatonnes CO₂/year";
     case "years":
       return "years";
     default:
-      return unit;
+      return "";
   }
 }

@@ -15,8 +15,8 @@ export a ready-to-post PNG.
 - **One consistent brand.** All visual tokens live in `lib/brand.ts` — change
   them once and every export re-skins.
 - **Pluggable data sources.** `lib/sources/` defines a small adapter interface.
-  The first adapter is World Bank Open Data (free, no key, thousands of
-  general-interest indicators). OWID, FRED, and Eurostat slot in the same way.
+  Four adapters ship today — World Bank, Our World in Data, OECD, and FRED —
+  and Eurostat/IMF slot in the same way.
 - **Works offline.** When a data source can't be reached (e.g. a locked-down
   sandbox), the app falls back to bundled sample snapshots and clearly labels
   the chart as a sample. Deployed with open egress, it pulls live figures.
@@ -35,6 +35,24 @@ lib/sources/index    lib/sources/*.ts        lib/angles.ts       lib/chart.ts   
 - `components/Studio.tsx` — the studio UI (topic picker, angle picker, theme /
   format / row controls, caption, export).
 
+## Data sources
+
+| Source | Adapter | Shape | Key? | Notes |
+|--------|---------|-------|------|-------|
+| **World Bank Open Data** | `worldbank.ts` | Country ranking | no | Thousands of indicators; latest year per country. |
+| **Our World in Data** | `owid.ts` | Country ranking | no | Any grapher slug via its CSV export; optional value scaling. |
+| **OECD** | `oecd.ts` | Country ranking | no | Generic SDMX-JSON parser. Dataflow query URLs are long/version-specific — validate each against [data-explorer.oecd.org](https://data-explorer.oecd.org). |
+| **FRED** (St. Louis Fed) | `fred.ts` | Time series (line) | yes | US economic series (inflation, unemployment, rates). Needs `FRED_API_KEY`. |
+
+Every adapter live-fetches first and falls back to a bundled sample snapshot
+(flagged in the UI) when the upstream is unreachable or a key is missing — so
+the studio always renders.
+
+Two data *shapes* exist: **rankings** (many entities at one moment → ranked bar,
+with top-N / dominance / concentration / extreme angles) and **time series**
+(one entity over time → line, with now / change / peak angles). Adapters set
+`temporal: true` for the latter.
+
 ## Run locally
 
 ```bash
@@ -49,6 +67,7 @@ npm run dev      # http://localhost:3000
 |-----|----------|---------|
 | `GEMINI_API_KEY` | no | Enables AI captions. Without it, the built-in caption writer is used. |
 | `GEMINI_TEXT_MODEL` | no | Defaults to `gemini-2.5-flash`. |
+| `FRED_API_KEY` | no | Enables live FRED series. Free from the St. Louis Fed. Without it, FRED topics serve the bundled sample. |
 
 ## Live data hosts
 
@@ -56,7 +75,10 @@ The app fetches from these hosts at runtime. In an unrestricted deploy
 (Render/Vercel) they work out of the box. If you run inside a network-policied
 sandbox and want live data during development, allowlist:
 
-- `api.worldbank.org` — indicator data
+- `api.worldbank.org` — World Bank indicator data
+- `ourworldindata.org` — OWID grapher CSVs
+- `sdmx.oecd.org` — OECD SDMX-JSON
+- `api.stlouisfed.org` — FRED series (only if using FRED)
 - `generativelanguage.googleapis.com` — Gemini captions (only if using AI captions)
 
 ## Deploy
