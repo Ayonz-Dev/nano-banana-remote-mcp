@@ -178,8 +178,8 @@ export function shortTitle(series: Series): string {
   if (has("wage")) return "minimum wage";
   if (has("electricity price", "power price")) return "electricity prices";
   if (has("density")) return "population density";
-  if (has("forest")) return "forest cover"; // before "area" ("forest area")
-  if (has("land area", "area")) return "land area";
+  if (has("forest")) return "forest cover";
+  if (has("land area")) return "land area"; // not bare "area" (cf. "metro area")
   if (has("border", "neighbour")) return "neighbours";
   if (has("r&d", "research")) return "R&D spending";
   if (has("unemployment")) return "unemployment";
@@ -198,6 +198,12 @@ export function shortTitle(series: Series): string {
   if (has("forest")) return "forest cover";
   if (has("urban")) return "urbanisation";
   if (has("internet")) return "internet use";
+  if (has("magnitude", "earthquake")) return "magnitude";
+  if (has("gini", "inequality")) return "income inequality";
+  if (has("river", "length")) return "length";
+  if (has("tourist", "arrivals", "visitor")) return "tourist arrivals";
+  if (has("alcohol")) return "alcohol consumption";
+  if (has("mobile", "cellular", "subscription")) return "mobile subscriptions";
   if (has("co₂", "co2")) return has("per cap") ? "CO₂ per person" : "CO₂ emissions";
   if (has("life expectancy")) return "life expectancy";
   if (has("population")) return "population";

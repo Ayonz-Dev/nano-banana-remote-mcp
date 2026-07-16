@@ -7,6 +7,7 @@ import { imf } from "./imf";
 import { restCountries } from "./restcountries";
 import { eurostat } from "./eurostat";
 import { wikidata } from "./wikidata";
+import { usgs } from "./usgs";
 
 // Registry of source adapters. Add a new adapter here and reference it from
 // catalog entries by id.
@@ -19,6 +20,7 @@ const ADAPTERS: Record<SourceId, SourceAdapter> = {
   restcountries: restCountries,
   eurostat,
   wikidata,
+  usgs,
 };
 
 // The curated catalog — the "topics" a user browses. Each entry maps a
@@ -473,6 +475,110 @@ export const CATALOG: CatalogEntry[] = [
     params: { indicator: "SP.URB.TOTL.IN.ZS" },
     defaultChart: "rankedBar",
     unit: "%",
+    additive: false,
+  },
+  {
+    id: "wb-tourism",
+    title: "The most visited countries",
+    metric: "International tourist arrivals",
+    blurb: "Where the world's travellers actually go.",
+    topic: "Economy",
+    source: "worldbank",
+    params: { indicator: "ST.INT.ARVL" },
+    defaultChart: "rankedBar",
+    unit: "visitors",
+    additive: true,
+  },
+  {
+    id: "wb-mobile",
+    title: "Phones outnumber people",
+    metric: "Mobile subscriptions (per 100 people)",
+    blurb: "Mobile subscriptions per 100 people — many top 100.",
+    topic: "Technology",
+    source: "worldbank",
+    params: { indicator: "IT.CEL.SETS.P2" },
+    defaultChart: "rankedBar",
+    unit: "per 100",
+    additive: false,
+  },
+
+  // ── Our World in Data (more) ────────────────────────────────────────────
+  {
+    id: "owid-alcohol",
+    title: "Who drinks the most",
+    metric: "Alcohol consumption per person",
+    blurb: "Litres of pure alcohol per adult per year.",
+    topic: "Society",
+    source: "owid",
+    params: { slug: "total-alcohol-consumption-per-capita-litres-of-pure-alcohol" },
+    defaultChart: "rankedBar",
+    unit: "L/yr",
+    additive: false,
+  },
+
+  // ── REST Countries (inequality) ─────────────────────────────────────────
+  {
+    id: "rc-gini",
+    title: "The most unequal countries",
+    metric: "Income inequality (Gini)",
+    blurb: "Gini index of income inequality — higher means more unequal.",
+    topic: "Society",
+    source: "restcountries",
+    params: { metric: "gini" },
+    defaultChart: "rankedBar",
+    unit: "Gini",
+    additive: false,
+  },
+
+  // ── Wikidata (non-country rankings) ─────────────────────────────────────
+  {
+    id: "wd-cities",
+    title: "The world's biggest cities",
+    metric: "City population (metro area)",
+    blurb: "The most populous urban areas on Earth.",
+    topic: "Population",
+    source: "wikidata",
+    params: {
+      labelVar: "cityLabel",
+      valueVar: "pop",
+      entityNoun: "cities",
+      query:
+        'SELECT ?cityLabel ?pop WHERE { ?city wdt:P31/wdt:P279* wd:Q515 . ?city wdt:P1082 ?pop . SERVICE wikibase:label { bd:serviceParam wikibase:language "en". } } ORDER BY DESC(?pop) LIMIT 20',
+    },
+    defaultChart: "rankedBar",
+    unit: "people",
+    additive: false,
+  },
+  {
+    id: "wd-rivers",
+    title: "The world's longest rivers",
+    metric: "River length",
+    blurb: "The longest rivers on the planet.",
+    topic: "Geography",
+    source: "wikidata",
+    params: {
+      labelVar: "riverLabel",
+      valueVar: "len",
+      entityNoun: "rivers",
+      query:
+        'SELECT ?riverLabel ?len WHERE { ?river wdt:P31/wdt:P279* wd:Q4022 . ?river wdt:P2043 ?len . SERVICE wikibase:label { bd:serviceParam wikibase:language "en". } } ORDER BY DESC(?len) LIMIT 20',
+    },
+    defaultChart: "rankedBar",
+    unit: "km",
+    additive: false,
+  },
+
+  // ── USGS (earthquakes) ──────────────────────────────────────────────────
+  {
+    id: "usgs-quakes",
+    title: "Biggest recent earthquakes",
+    metric: "Earthquake magnitude",
+    blurb: "The strongest quakes recorded in the past year.",
+    topic: "Environment",
+    source: "usgs",
+    params: { minmagnitude: "6", days: "365", limit: "20" },
+    defaultChart: "rankedBar",
+    unit: "M",
     additive: false,
   },
 ];

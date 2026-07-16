@@ -17,6 +17,7 @@ interface RcCountry {
   borders?: string[];
   timezones?: string[];
   languages?: Record<string, string>;
+  gini?: Record<string, number>;
 }
 
 const METRICS = {
@@ -25,12 +26,21 @@ const METRICS = {
   borders: { unit: "neighbours", additive: false },
   timezones: { unit: "time zones", additive: false },
   languages: { unit: "languages", additive: false },
+  gini: { unit: "Gini", additive: false },
 } as const;
 
 type MetricKey = keyof typeof METRICS;
 
 // REST Countries fields to request — kept in sync with the metrics above.
-const FIELDS = "name,cca3,area,population,borders,timezones,languages";
+const FIELDS = "name,cca3,area,population,borders,timezones,languages,gini";
+
+// The gini field is a { year: value } map; take the most recent year.
+function latestGini(gini?: Record<string, number>): number | null {
+  if (!gini) return null;
+  const years = Object.keys(gini).sort();
+  const last = years[years.length - 1];
+  return last != null ? gini[last] : null;
+}
 
 function valueFor(c: RcCountry, metric: MetricKey): number | null {
   switch (metric) {
@@ -46,6 +56,8 @@ function valueFor(c: RcCountry, metric: MetricKey): number | null {
       return c.timezones ? c.timezones.length : 0;
     case "languages":
       return c.languages ? Object.keys(c.languages).length : 0;
+    case "gini":
+      return latestGini(c.gini);
   }
 }
 

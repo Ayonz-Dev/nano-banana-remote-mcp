@@ -89,7 +89,8 @@ export type SourceId =
   | "imf"
   | "restcountries"
   | "eurostat"
-  | "wikidata";
+  | "wikidata"
+  | "usgs";
 
 export interface SourceAdapter {
   id: SourceId;
