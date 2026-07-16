@@ -59,6 +59,17 @@ with top-N / dominance / concentration / extreme angles) and **time series**
 (one entity over time → line, with now / change / peak angles). Adapters set
 `temporal: true` for the latter.
 
+## Chart forms
+
+- **Ranked bar** — the default for rankings.
+- **Line** — for time series (`temporal`).
+- **World map (choropleth)** — offered whenever a ranking geolocates to
+  countries. `lib/geo.ts` resolves each row to an ISO3 code (handling 2-letter
+  and Eurostat's `EL`/`UK` quirks) and `lib/worldmap.ts` registers a bundled
+  Natural Earth boundary set (via `world-atlas`, no runtime fetch) keyed by
+  ISO3 so regions match exactly. Non-country rankings (e.g. tallest buildings)
+  don't offer the map.
+
 ## Run locally
 
 ```bash

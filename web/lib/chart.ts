@@ -3,6 +3,9 @@ import type { Series } from "./sources/types";
 import { brand, type Theme } from "./brand";
 import { formatAxis, formatValue, subtitleFor } from "./format";
 import { shortTitle } from "./angles";
+import { toMapData } from "./geo";
+
+export type ChartForm = "rankedBar" | "line" | "map";
 
 export interface ChartSpec {
   series: Series;
@@ -10,7 +13,7 @@ export interface ChartSpec {
   /** Number of rows to show. */
   topN: number;
   /** Chart form. */
-  form: "rankedBar" | "line";
+  form: ChartForm;
   /** Big headline (usually from the selected angle). */
   title: string;
   /** Optional override subtitle; defaults to "year · unit". */
@@ -236,9 +239,70 @@ function hexWithAlpha(hex: string, alpha: number): string {
   return `${hex}${a}`;
 }
 
+// Choropleth world map. Regions are keyed by ISO3 (see lib/worldmap.ts, which
+// registers the "world" map with ISO3 region names) and shaded by value.
+function mapOption(spec: ChartSpec, p: Palette): EChartsOption {
+  const { series } = spec;
+  const rows = toMapData(series);
+  const values = rows.map((r) => r.value);
+  const min = values.length ? Math.min(...values) : 0;
+  const max = values.length ? Math.max(...values) : 1;
+  const unit = series.unit;
+
+  return {
+    backgroundColor: p.paper,
+    animation: false,
+    ...chrome(spec, p),
+    visualMap: {
+      min,
+      max,
+      left: 40,
+      bottom: 54,
+      orient: "horizontal",
+      calculable: true,
+      itemWidth: 16,
+      itemHeight: 140,
+      inRange: { color: [hexWithAlpha(p.accent, 0.16), p.accent] },
+      textStyle: { color: p.subInk, fontFamily: brand.fonts.body, fontSize: 14 },
+      formatter: (value) => formatAxis(Number(value), unit),
+    },
+    tooltip: {
+      trigger: "item",
+      formatter: (params: unknown) => {
+        const d = params as { data?: { display?: string; value?: number } };
+        if (!d.data) return "";
+        return `${d.data.display}: ${formatValue(Number(d.data.value), unit)}`;
+      },
+    },
+    series: [
+      {
+        type: "map",
+        map: "world",
+        roam: false,
+        left: 20,
+        right: 20,
+        top: 150,
+        bottom: 80,
+        itemStyle: {
+          areaColor: p.paperAlt,
+          borderColor: p.paper,
+          borderWidth: 0.5,
+        },
+        emphasis: {
+          disabled: true,
+        },
+        select: { disabled: true },
+        data: rows,
+      },
+    ],
+  };
+}
+
 export function buildChartOption(spec: ChartSpec): EChartsOption {
   const p = paletteFor(spec.theme);
-  return spec.form === "line" ? lineOption(spec, p) : rankedBarOption(spec, p);
+  if (spec.form === "line") return lineOption(spec, p);
+  if (spec.form === "map") return mapOption(spec, p);
+  return rankedBarOption(spec, p);
 }
 
 export { shortTitle };

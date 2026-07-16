@@ -3,12 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ECharts } from "echarts";
 import ChartCanvas from "./ChartCanvas";
-import { buildChartOption, paletteFor } from "@/lib/chart";
+import { buildChartOption, paletteFor, type ChartForm } from "@/lib/chart";
 import { formats, type FormatKey, type Theme } from "@/lib/brand";
 import { subtitleFor } from "@/lib/format";
+import { mappable } from "@/lib/geo";
 import type { Series } from "@/lib/sources/types";
 import type { Angle } from "@/lib/angles";
 import type { Platform } from "@/lib/caption";
+
+const FORM_LABELS: Record<ChartForm, string> = {
+  rankedBar: "Bar",
+  map: "Map",
+  line: "Line",
+};
 
 export interface CatalogCard {
   id: string;
@@ -42,7 +49,7 @@ export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
   const [error, setError] = useState<string | null>(null);
 
   const [angleIdx, setAngleIdx] = useState(0);
-  const [form, setForm] = useState<"rankedBar" | "line">("rankedBar");
+  const [form, setForm] = useState<ChartForm>("rankedBar");
   const [theme, setTheme] = useState<Theme>("light");
   const [formatKey, setFormatKey] = useState<FormatKey>("igPortrait");
   const [topN, setTopN] = useState(10);
@@ -83,6 +90,20 @@ export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
 
   const angle: Angle | undefined = payload?.angles[angleIdx];
   const format = formats[formatKey];
+
+  // Chart forms available for the current series: trends are line-only; country
+  // rankings can be a bar chart and, when geolocatable, a world map.
+  const availableForms = useMemo<ChartForm[]>(() => {
+    if (!payload) return ["rankedBar"];
+    if (payload.series.temporal) return ["line"];
+    return mappable(payload.series) ? ["rankedBar", "map"] : ["rankedBar"];
+  }, [payload]);
+
+  // Keep the selected form valid when the topic changes.
+  useEffect(() => {
+    if (!availableForms.includes(form)) setForm(availableForms[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableForms]);
 
   // When a different angle is picked, adopt its suggested row count.
   useEffect(() => {
@@ -205,6 +226,20 @@ export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
         {error && <div className="error">{error}</div>}
 
         <div className="controls">
+          {availableForms.length > 1 && (
+            <div className="seg">
+              {availableForms.map((f) => (
+                <button
+                  key={f}
+                  className={form === f ? "on" : ""}
+                  onClick={() => setForm(f)}
+                >
+                  {FORM_LABELS[f]}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="seg">
             {(["light", "dark"] as Theme[]).map((t) => (
               <button
@@ -252,6 +287,7 @@ export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
               width={format.w}
               height={format.h}
               displayWidth={display.width}
+              needsWorldMap={form === "map"}
               onReady={setChart}
             />
           )}
