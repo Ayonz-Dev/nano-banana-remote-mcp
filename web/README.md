@@ -55,10 +55,11 @@ Every adapter live-fetches first and falls back to a bundled sample snapshot
 (flagged in the UI) when the upstream is unreachable or a key is missing — so
 the studio always renders.
 
-Two data *shapes* exist: **rankings** (many entities at one moment → ranked bar,
-with top-N / dominance / concentration / extreme angles) and **time series**
-(one entity over time → line, with now / change / peak angles). Adapters set
-`temporal: true` for the latter.
+Three data *shapes* exist: **rankings** (many entities at one moment → ranked
+bar, with top-N / dominance / concentration / extreme angles), **time series**
+(one entity over time → line, with now / change / peak angles; adapters set
+`temporal: true`), and **timelines** (a ranking that changes over years → the
+bar-chart-race; the `Timeline` type, served from `/api/timeline/:id`).
 
 ## Chart forms
 
@@ -70,6 +71,11 @@ with top-N / dominance / concentration / extreme angles) and **time series**
   Natural Earth boundary set (via `world-atlas`, no runtime fetch) keyed by
   ISO3 so regions match exactly. Non-country rankings (e.g. tallest buildings)
   don't offer the map.
+- **Bar-chart-race** — for `defaultChart: "race"` topics. `lib/sources/timeline.ts`
+  builds annual frames (World Bank has every year in one call; sparse fixtures
+  are interpolated to annual). `RacePlayer` drives echarts imperatively with
+  `realtimeSort`, a stable colour per entity, and a year counter, and exports
+  the animation to **WebM** by recording the canvas via `MediaRecorder`.
 
 ## Run locally
 

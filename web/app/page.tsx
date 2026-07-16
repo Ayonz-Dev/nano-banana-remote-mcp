@@ -9,6 +9,7 @@ export default function Page() {
     title: e.title,
     blurb: e.blurb,
     topic: e.topic,
+    defaultChart: e.defaultChart,
   }));
 
   return (

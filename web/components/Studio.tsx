@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ECharts } from "echarts";
 import ChartCanvas from "./ChartCanvas";
+import RacePlayer from "./RacePlayer";
 import { buildChartOption, paletteFor, type ChartForm } from "@/lib/chart";
 import { formats, type FormatKey, type Theme } from "@/lib/brand";
-import { subtitleFor } from "@/lib/format";
+import { subtitleFor, formatValue } from "@/lib/format";
 import { mappable } from "@/lib/geo";
-import type { Series } from "@/lib/sources/types";
+import type { Series, Timeline } from "@/lib/sources/types";
 import type { Angle } from "@/lib/angles";
 import type { Platform } from "@/lib/caption";
 
@@ -22,6 +23,28 @@ export interface CatalogCard {
   title: string;
   blurb: string;
   topic: string;
+  defaultChart: "rankedBar" | "line" | "race";
+}
+
+// Summarise a race for caption copy: who led at the start vs the end.
+function raceCaption(timeline: Timeline): { title: string; detail: string } {
+  const first = timeline.frames[0];
+  const last = timeline.frames[timeline.frames.length - 1];
+  const leaderAt = (f: { values: number[] }) => {
+    let idx = 0;
+    for (let i = 1; i < f.values.length; i++) if (f.values[i] > f.values[idx]) idx = i;
+    return idx;
+  };
+  const s = leaderAt(first);
+  const e = leaderAt(last);
+  const startLeader = timeline.entities[s].label;
+  const endLeader = timeline.entities[e].label;
+  const endVal = formatValue(last.values[e], timeline.unit);
+  const detail =
+    s === e
+      ? `${startLeader} held the top spot from ${first.year} to ${last.year}, reaching ${endVal}.`
+      : `${startLeader} led in ${first.year}, but by ${last.year} ${endLeader} is #1 at ${endVal}.`;
+  return { title: `${timeline.title}: ${first.year}–${last.year}`, detail };
 }
 
 interface SeriesPayload {
@@ -45,6 +68,7 @@ const PLATFORMS: { key: Platform; label: string }[] = [
 export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
   const [selectedId, setSelectedId] = useState<string>(catalog[0]?.id ?? "");
   const [payload, setPayload] = useState<SeriesPayload | null>(null);
+  const [timeline, setTimeline] = useState<Timeline | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,31 +85,54 @@ export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
 
   const [chart, setChart] = useState<ECharts | null>(null);
 
-  // Load a topic whenever the selection changes.
+  const selectedCard = catalog.find((c) => c.id === selectedId);
+  const isRace = selectedCard?.defaultChart === "race";
+
+  // Load a topic whenever the selection changes. Race topics use the timeline
+  // endpoint; everything else uses the series endpoint.
   useEffect(() => {
     if (!selectedId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
     setCaption(null);
-    fetch(`/api/series/${selectedId}`)
-      .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json()).error ?? "Failed to load");
-        return r.json() as Promise<SeriesPayload>;
-      })
-      .then((data) => {
-        if (cancelled) return;
-        setPayload(data);
-        setAngleIdx(0);
-        setForm(data.entry.defaultChart);
-        const firstTop = data.angles[0]?.topN ?? 10;
-        setTopN(Math.min(firstTop, data.series.points.length));
-      })
-      .catch((e) => !cancelled && setError(e.message))
-      .finally(() => !cancelled && setLoading(false));
+    setPayload(null);
+    setTimeline(null);
+
+    if (selectedCard?.defaultChart === "race") {
+      // Races look best wide.
+      setFormatKey("landscape");
+      fetch(`/api/timeline/${selectedId}`)
+        .then(async (r) => {
+          if (!r.ok) throw new Error((await r.json()).error ?? "Failed to load");
+          return r.json() as Promise<{ timeline: Timeline }>;
+        })
+        .then((data) => {
+          if (!cancelled) setTimeline(data.timeline);
+        })
+        .catch((e) => !cancelled && setError(e.message))
+        .finally(() => !cancelled && setLoading(false));
+    } else {
+      fetch(`/api/series/${selectedId}`)
+        .then(async (r) => {
+          if (!r.ok) throw new Error((await r.json()).error ?? "Failed to load");
+          return r.json() as Promise<SeriesPayload>;
+        })
+        .then((data) => {
+          if (cancelled) return;
+          setPayload(data);
+          setAngleIdx(0);
+          setForm(data.entry.defaultChart);
+          const firstTop = data.angles[0]?.topN ?? 10;
+          setTopN(Math.min(firstTop, data.series.points.length));
+        })
+        .catch((e) => !cancelled && setError(e.message))
+        .finally(() => !cancelled && setLoading(false));
+    }
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
   const angle: Angle | undefined = payload?.angles[angleIdx];
@@ -134,20 +181,34 @@ export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
   }, [format]);
 
   async function handleCaption() {
-    if (!payload || !angle) return;
+    // Build the caption prompt from either the selected angle or the race.
+    let promptFields: { title: string; detail: string; source: string; fromFixture?: boolean };
+    if (isRace && timeline) {
+      const rc = raceCaption(timeline);
+      promptFields = {
+        title: rc.title,
+        detail: rc.detail,
+        source: timeline.source,
+        fromFixture: timeline.fromFixture,
+      };
+    } else if (payload && angle) {
+      promptFields = {
+        title: angle.headline,
+        detail: angle.detail,
+        source: payload.series.source,
+        fromFixture: payload.series.fromFixture,
+      };
+    } else {
+      return;
+    }
+
     setCaptionLoading(true);
     setCopied(false);
     try {
       const res = await fetch("/api/caption", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title: angle.headline,
-          detail: angle.detail,
-          source: payload.series.source,
-          platform,
-          fromFixture: payload.series.fromFixture,
-        }),
+        body: JSON.stringify({ ...promptFields, platform }),
       });
       setCaption((await res.json()) as CaptionResult);
     } catch {
@@ -217,7 +278,7 @@ export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
 
       {/* Right: preview + controls */}
       <main>
-        {payload?.series.fromFixture && (
+        {(payload?.series.fromFixture || timeline?.fromFixture) && (
           <div className="banner">
             Showing a bundled sample snapshot — live network to the data source
             isn&apos;t available here. Deployed, this pulls live figures.
@@ -281,7 +342,20 @@ export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
 
         <div className="preview-wrap">
           {loading && <div className="muted">Loading data…</div>}
-          {!loading && option && (
+          {!loading && isRace && timeline && (
+            <RacePlayer
+              key={selectedId}
+              timeline={timeline}
+              theme={theme}
+              topN={12}
+              title={(selectedCard?.title ?? timeline.title).replace(" 🏁", "")}
+              width={format.w}
+              height={format.h}
+              displayWidth={display.width}
+              onReady={setChart}
+            />
+          )}
+          {!loading && !isRace && option && (
             <ChartCanvas
               option={option}
               width={format.w}
@@ -291,14 +365,14 @@ export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
               onReady={setChart}
             />
           )}
-          {!loading && !option && !error && (
+          {!loading && !isRace && !option && !error && (
             <div className="muted">Pick a topic to start.</div>
           )}
         </div>
 
         <div className="actions">
           <button className="btn" onClick={handleDownload} disabled={!chart}>
-            Download PNG
+            {isRace ? "Download frame (PNG)" : "Download PNG"}
           </button>
           <div className="seg">
             {PLATFORMS.map((p) => (
@@ -314,7 +388,7 @@ export default function Studio({ catalog }: { catalog: CatalogCard[] }) {
           <button
             className="btn secondary"
             onClick={handleCaption}
-            disabled={!angle || captionLoading}
+            disabled={captionLoading || (!angle && !isRace)}
           >
             {captionLoading ? "Writing…" : "Generate caption"}
           </button>

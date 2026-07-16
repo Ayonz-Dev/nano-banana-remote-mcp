@@ -47,6 +47,32 @@ export interface Series {
   fromFixture?: boolean;
 }
 
+// ── Timeline (bar-chart-race) shape ────────────────────────────────────────
+// A ranking that changes over time: a fixed set of entities, each with a value
+// per year. Frames are annual and aligned to the `entities` order.
+
+export interface TimelineEntity {
+  label: string;
+  id?: string;
+}
+
+export interface TimelineFrame {
+  year: number;
+  /** Values aligned to the Timeline.entities array (one per entity). */
+  values: number[];
+}
+
+export interface Timeline {
+  title: string;
+  unit?: string;
+  source: string;
+  entities: TimelineEntity[];
+  frames: TimelineFrame[];
+  additive?: boolean;
+  entityNoun?: string;
+  fromFixture?: boolean;
+}
+
 export interface CatalogEntry {
   /** Stable slug used in the UI + API. */
   id: string;
@@ -62,8 +88,8 @@ export interface CatalogEntry {
   source: SourceId;
   /** Adapter-specific fetch config (e.g. World Bank indicator code). */
   params: Record<string, string>;
-  /** Suggested default chart form. */
-  defaultChart: "rankedBar" | "line";
+  /** Suggested default chart form. "race" topics use the timeline endpoint. */
+  defaultChart: "rankedBar" | "line" | "race";
   /** Suggested unit for display. */
   unit?: string;
   /** Whether the metric is additive (see Series.additive). */

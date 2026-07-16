@@ -581,6 +581,32 @@ export const CATALOG: CatalogEntry[] = [
     unit: "M",
     additive: false,
   },
+
+  // ── Bar-chart races (rankings over time) ────────────────────────────────
+  {
+    id: "race-gdp",
+    title: "Top economies over time 🏁",
+    metric: "GDP (current US$)",
+    blurb: "Watch China climb the GDP rankings from 1990 to today.",
+    topic: "Economy",
+    source: "worldbank",
+    params: { indicator: "NY.GDP.MKTP.CD", raceTopN: "12" },
+    defaultChart: "race",
+    unit: "US$",
+    additive: true,
+  },
+  {
+    id: "race-population",
+    title: "Most populous over time 🏁",
+    metric: "Population, total",
+    blurb: "India overtakes China — the population race since 1990.",
+    topic: "Population",
+    source: "worldbank",
+    params: { indicator: "SP.POP.TOTL", raceTopN: "12" },
+    defaultChart: "race",
+    unit: "people",
+    additive: true,
+  },
 ];
 
 export function getCatalogEntry(id: string): CatalogEntry | undefined {
