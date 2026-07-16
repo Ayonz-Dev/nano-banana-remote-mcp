@@ -20,6 +20,46 @@ export function isRealCountryCode(code?: string | null): boolean {
   return !AGGREGATE_CODES.has(c);
 }
 
+// ISO3 → display name for sources that label rows by code (e.g. IMF). Covers
+// the countries that show up in general-interest rankings; unknown codes fall
+// back to the code itself.
+const ISO3_NAMES: Record<string, string> = {
+  USA: "United States", CHN: "China", JPN: "Japan", DEU: "Germany",
+  IND: "India", GBR: "United Kingdom", FRA: "France", ITA: "Italy",
+  BRA: "Brazil", CAN: "Canada", RUS: "Russia", KOR: "South Korea",
+  AUS: "Australia", ESP: "Spain", MEX: "Mexico", IDN: "Indonesia",
+  NLD: "Netherlands", SAU: "Saudi Arabia", TUR: "Turkey", CHE: "Switzerland",
+  POL: "Poland", SWE: "Sweden", BEL: "Belgium", ARG: "Argentina",
+  NOR: "Norway", AUT: "Austria", ARE: "United Arab Emirates", ISR: "Israel",
+  IRL: "Ireland", NGA: "Nigeria", ZAF: "South Africa", EGY: "Egypt",
+  DNK: "Denmark", SGP: "Singapore", MYS: "Malaysia", PHL: "Philippines",
+  PAK: "Pakistan", BGD: "Bangladesh", VNM: "Vietnam", THA: "Thailand",
+  IRN: "Iran", COL: "Colombia", CHL: "Chile", FIN: "Finland",
+  PRT: "Portugal", GRC: "Greece", CZE: "Czechia", ROU: "Romania",
+  NZL: "New Zealand", PER: "Peru", KAZ: "Kazakhstan", QAT: "Qatar",
+  KWT: "Kuwait", HUN: "Hungary", UKR: "Ukraine", MAR: "Morocco",
+  ETH: "Ethiopia", KEN: "Kenya", DZA: "Algeria", IRQ: "Iraq",
+  LUX: "Luxembourg", ISL: "Iceland", SVK: "Slovakia", SVN: "Slovenia",
+  LTU: "Lithuania", LVA: "Latvia", EST: "Estonia", HRV: "Croatia",
+  BGR: "Bulgaria", SRB: "Serbia", BHR: "Bahrain", OMN: "Oman",
+  BRN: "Brunei", TTO: "Trinidad & Tobago", URY: "Uruguay", PRY: "Paraguay",
+  COD: "DR Congo", TZA: "Tanzania", UGA: "Uganda", ZMB: "Zambia",
+  NER: "Niger", MLI: "Mali", SDN: "Sudan", TCD: "Chad",
+  LBY: "Libya", MNG: "Mongolia", NPL: "Nepal", LKA: "Sri Lanka",
+  MMR: "Myanmar", KHM: "Cambodia", UZB: "Uzbekistan", AZE: "Azerbaijan",
+  BLR: "Belarus", GEO: "Georgia", TUN: "Tunisia", JOR: "Jordan",
+  LBN: "Lebanon", CRI: "Costa Rica", PAN: "Panama", ECU: "Ecuador",
+  BOL: "Bolivia", VEN: "Venezuela", CYP: "Cyprus", MLT: "Malta",
+  MCO: "Monaco", MDV: "Maldives", BRB: "Barbados", MUS: "Mauritius",
+  RWA: "Rwanda", NAM: "Namibia", BWA: "Botswana", GHA: "Ghana",
+};
+
+export function countryName(code?: string | null): string {
+  if (!code) return "";
+  const c = code.trim().toUpperCase();
+  return ISO3_NAMES[c] ?? c;
+}
+
 const FETCH_TIMEOUT_MS = 12_000;
 
 // fetch() with an abort timeout so a hung upstream can't stall a request.

@@ -86,12 +86,13 @@ function rankingAngles(series: Series): Angle[] {
     }
   }
 
-  // 4) The surprise — highest per-capita / extreme value framing.
+  // 4) The surprise — the extreme value framing. "tops the world for X" reads
+  // naturally for every metric (including counts like "neighbours").
   angles.push({
     id: "extreme",
     label: "The extreme",
-    headline: `${leader.label}: the world's highest ${shortTitle(series)}`,
-    detail: `${leader.label} tops the list at ${formatValue(leader.value, unit)} — ${(
+    headline: `${leader.label} tops the world for ${shortTitle(series)}`,
+    detail: `${leader.label} leads at ${formatValue(leader.value, unit)} — ${(
       leader.value / (total / pts.length)
     ).toFixed(1)}× the average of the group.`,
     topN: clampTop(12, pts.length),
@@ -163,21 +164,31 @@ function temporalAngles(series: Series): Angle[] {
 const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 // A compact noun phrase for the metric, derived from the series title. Order
-// matters: check the specific terms before generic ones (e.g. "R&D (% of GDP)"
-// must match R&D, not GDP).
+// matters: specific terms are checked before generic ones so that, e.g.,
+// "Government debt (% of GDP)" resolves to debt, not GDP.
 export function shortTitle(series: Series): string {
   const t = series.title.toLowerCase();
-  if (t.includes("r&d") || t.includes("research")) return "R&D spending";
-  if (t.includes("unemployment")) return "unemployment";
-  if (t.includes("inflation")) return "inflation";
-  if (t.includes("wind") || t.includes("solar") || t.includes("renewable")) {
-    return "wind & solar power";
-  }
-  if (t.includes("population")) return "population";
-  if (t.includes("co₂") || t.includes("co2")) {
-    return t.includes("per capita") ? "CO₂ per person" : "CO₂ emissions";
-  }
-  if (t.includes("life expectancy")) return "life expectancy";
-  if (t.includes("gdp")) return "GDP";
+  const has = (...words: string[]) => words.some((w) => t.includes(w));
+
+  if (has("debt")) return "government debt";
+  if (has("gdp per capita") || (has("gdp") && has("per cap"))) return "GDP per person";
+  if (has("military")) return "military spending";
+  if (has("health")) return "health spending";
+  if (has("wage")) return "minimum wage";
+  if (has("electricity price", "power price")) return "electricity prices";
+  if (has("density")) return "population density";
+  if (has("land area", "area")) return "land area";
+  if (has("border", "neighbour")) return "neighbours";
+  if (has("r&d", "research")) return "R&D spending";
+  if (has("unemployment")) return "unemployment";
+  if (has("inflation")) return "inflation";
+  if (has("federal funds", "funds rate", "interest")) return "interest rates";
+  if (has("s&p", "stock")) return "the S&P 500";
+  if (has("wind", "solar", "renewable")) return "wind & solar power";
+  if (has("internet")) return "internet use";
+  if (has("co₂", "co2")) return has("per cap") ? "CO₂ per person" : "CO₂ emissions";
+  if (has("life expectancy")) return "life expectancy";
+  if (has("population")) return "population";
+  if (has("gdp")) return "GDP";
   return series.title;
 }

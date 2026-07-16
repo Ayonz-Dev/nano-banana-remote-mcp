@@ -15,8 +15,9 @@ export a ready-to-post PNG.
 - **One consistent brand.** All visual tokens live in `lib/brand.ts` — change
   them once and every export re-skins.
 - **Pluggable data sources.** `lib/sources/` defines a small adapter interface.
-  Four adapters ship today — World Bank, Our World in Data, OECD, and FRED —
-  and Eurostat/IMF slot in the same way.
+  Seven adapters ship today — World Bank, Our World in Data, OECD, FRED, IMF,
+  REST Countries, and Eurostat — across ~22 curated topics. New sources slot in
+  the same way.
 - **Works offline.** When a data source can't be reached (e.g. a locked-down
   sandbox), the app falls back to bundled sample snapshots and clearly labels
   the chart as a sample. Deployed with open egress, it pulls live figures.
@@ -43,6 +44,9 @@ lib/sources/index    lib/sources/*.ts        lib/angles.ts       lib/chart.ts   
 | **Our World in Data** | `owid.ts` | Country ranking | no | Any grapher slug via its CSV export; optional value scaling. |
 | **OECD** | `oecd.ts` | Country ranking | no | Generic SDMX-JSON parser. Dataflow query URLs are long/version-specific — validate each against [data-explorer.oecd.org](https://data-explorer.oecd.org). |
 | **FRED** (St. Louis Fed) | `fred.ts` | Time series (line) | yes | US economic series (inflation, unemployment, rates). Needs `FRED_API_KEY`. |
+| **IMF** (World Economic Outlook) | `imf.ts` | Country ranking | no | DataMapper API — clean JSON, works live out of the box (GDP/capita, govt debt). |
+| **REST Countries** | `restcountries.ts` | Country ranking | no | Geography/demographics quirks (land area, density, borders) from one keyless fetch. |
+| **Eurostat** | `eurostat.ts` | Country ranking (EU) | no | JSON-stat parser. Dataset codes + query filters are specific — validate against the [Eurostat database](https://ec.europa.eu/eurostat/web/main/data/database). |
 
 Every adapter live-fetches first and falls back to a bundled sample snapshot
 (flagged in the UI) when the upstream is unreachable or a key is missing — so
@@ -78,6 +82,9 @@ sandbox and want live data during development, allowlist:
 - `api.worldbank.org` — World Bank indicator data
 - `ourworldindata.org` — OWID grapher CSVs
 - `sdmx.oecd.org` — OECD SDMX-JSON
+- `www.imf.org` — IMF DataMapper
+- `restcountries.com` — REST Countries
+- `ec.europa.eu` — Eurostat JSON-stat
 - `api.stlouisfed.org` — FRED series (only if using FRED)
 - `generativelanguage.googleapis.com` — Gemini captions (only if using AI captions)
 

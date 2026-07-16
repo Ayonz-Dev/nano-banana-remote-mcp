@@ -16,13 +16,14 @@ export function compact(value: number): string {
   for (const [scale, suffix] of ABS_UNITS) {
     if (abs >= scale) {
       const scaled = value / scale;
-      const digits = scaled >= 100 ? 0 : 1;
-      return `${scaled.toFixed(digits)}${suffix}`;
+      const digits = Math.abs(scaled) >= 100 ? 0 : 1;
+      return `${+scaled.toFixed(digits)}${suffix}`;
     }
   }
-  if (abs >= 100) return value.toFixed(0);
-  if (abs >= 10) return value.toFixed(1);
-  return value.toFixed(2);
+  // Whole numbers (border counts, densities) print without a spurious ".0".
+  if (Number.isInteger(value)) return String(value);
+  if (abs >= 100) return String(Math.round(value));
+  return String(+value.toFixed(2));
 }
 
 // Trim a trailing ".0" so "61.0%" reads as "61%" but "3.6%" stays "3.6%".
@@ -32,6 +33,8 @@ export function formatValue(value: number, unit?: string): string {
   if (unit === "US$" || unit === "$") return `$${compact(value)}`;
   if (unit === "%") return `${trim(value)}%`;
   if (unit === "people") return compact(value);
+  // Euro units like "€/mo" or "€/kWh" read best with the symbol up front.
+  if (unit && unit.startsWith("€")) return `€${compact(value)}${unit.slice(1)}`;
   const compacted = compact(value);
   return unit ? `${compacted} ${unit}` : compacted;
 }
@@ -40,6 +43,7 @@ export function formatValue(value: number, unit?: string): string {
 export function formatAxis(value: number, unit?: string): string {
   if (unit === "US$" || unit === "$") return `$${compact(value)}`;
   if (unit === "%") return `${trim(value)}%`;
+  if (unit && unit.startsWith("€")) return `€${compact(value)}`;
   return compact(value);
 }
 

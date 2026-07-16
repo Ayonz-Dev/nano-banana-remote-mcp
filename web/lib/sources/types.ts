@@ -70,9 +70,18 @@ export type Topic =
   | "Environment"
   | "Technology"
   | "Health"
-  | "Energy";
+  | "Energy"
+  | "Geography"
+  | "Society";
 
-export type SourceId = "worldbank" | "owid" | "oecd" | "fred";
+export type SourceId =
+  | "worldbank"
+  | "owid"
+  | "oecd"
+  | "fred"
+  | "imf"
+  | "restcountries"
+  | "eurostat";
 
 export interface SourceAdapter {
   id: SourceId;
