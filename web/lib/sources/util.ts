@@ -63,13 +63,17 @@ export function countryName(code?: string | null): string {
 const FETCH_TIMEOUT_MS = 12_000;
 
 // fetch() with an abort timeout so a hung upstream can't stall a request.
-export async function fetchText(url: string, accept = "text/csv"): Promise<string> {
+export async function fetchText(
+  url: string,
+  accept = "text/csv",
+  extraHeaders?: Record<string, string>,
+): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { accept },
+      headers: { accept, ...extraHeaders },
       next: { revalidate: 3600 },
     });
     if (!res.ok) throw new Error(`Upstream returned ${res.status}`);
@@ -79,8 +83,12 @@ export async function fetchText(url: string, accept = "text/csv"): Promise<strin
   }
 }
 
-export async function fetchJson<T>(url: string, accept = "application/json"): Promise<T> {
-  const text = await fetchText(url, accept);
+export async function fetchJson<T>(
+  url: string,
+  accept = "application/json",
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
+  const text = await fetchText(url, accept, extraHeaders);
   return JSON.parse(text) as T;
 }
 

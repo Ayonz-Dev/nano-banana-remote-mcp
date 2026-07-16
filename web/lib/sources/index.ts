@@ -6,6 +6,7 @@ import { fred } from "./fred";
 import { imf } from "./imf";
 import { restCountries } from "./restcountries";
 import { eurostat } from "./eurostat";
+import { wikidata } from "./wikidata";
 
 // Registry of source adapters. Add a new adapter here and reference it from
 // catalog entries by id.
@@ -17,6 +18,7 @@ const ADAPTERS: Record<SourceId, SourceAdapter> = {
   imf,
   restcountries: restCountries,
   eurostat,
+  wikidata,
 };
 
 // The curated catalog — the "topics" a user browses. Each entry maps a
@@ -314,6 +316,163 @@ export const CATALOG: CatalogEntry[] = [
     params: { dataset: "nrg_pc_204", query: "unit=KWH&product=6000" },
     defaultChart: "rankedBar",
     unit: "€/kWh",
+    additive: false,
+  },
+
+  // ── REST Countries (more metrics) ───────────────────────────────────────
+  {
+    id: "rc-timezones",
+    title: "Spanning the most time zones",
+    metric: "Number of time zones",
+    blurb: "Countries whose territory stretches across the most clocks.",
+    topic: "Geography",
+    source: "restcountries",
+    params: { metric: "timezones" },
+    defaultChart: "rankedBar",
+    unit: "time zones",
+    additive: false,
+  },
+  {
+    id: "rc-languages",
+    title: "Most official languages",
+    metric: "Official languages",
+    blurb: "Where the most languages share official status.",
+    topic: "Society",
+    source: "restcountries",
+    params: { metric: "languages" },
+    defaultChart: "rankedBar",
+    unit: "languages",
+    additive: false,
+  },
+
+  // ── Wikidata (cultural rankings) ────────────────────────────────────────
+  // NOTE: SPARQL queries are best-effort; validate at query.wikidata.org.
+  {
+    id: "wd-heritage",
+    title: "Most World Heritage sites",
+    metric: "UNESCO World Heritage sites",
+    blurb: "Which countries hold the most UNESCO-listed treasures.",
+    topic: "Culture",
+    source: "wikidata",
+    params: {
+      labelVar: "countryLabel",
+      valueVar: "count",
+      query:
+        'SELECT ?countryLabel (COUNT(?s) AS ?count) WHERE { ?s wdt:P1435 wd:Q9259 . ?s wdt:P17 ?country . SERVICE wikibase:label { bd:serviceParam wikibase:language "en". } } GROUP BY ?countryLabel ORDER BY DESC(?count) LIMIT 25',
+    },
+    defaultChart: "rankedBar",
+    unit: "sites",
+    additive: true,
+  },
+  {
+    id: "wd-nobel",
+    title: "Most Nobel laureates",
+    metric: "Nobel laureates by country",
+    blurb: "Nobel Prize winners by country of citizenship.",
+    topic: "Culture",
+    source: "wikidata",
+    params: {
+      labelVar: "countryLabel",
+      valueVar: "count",
+      query:
+        'SELECT ?countryLabel (COUNT(DISTINCT ?p) AS ?count) WHERE { ?p wdt:P166 ?a . ?a wdt:P31 wd:Q7191 . ?p wdt:P27 ?country . SERVICE wikibase:label { bd:serviceParam wikibase:language "en". } } GROUP BY ?countryLabel ORDER BY DESC(?count) LIMIT 25',
+    },
+    defaultChart: "rankedBar",
+    unit: "laureates",
+    additive: true,
+  },
+  {
+    id: "wd-buildings",
+    title: "The world's tallest buildings",
+    metric: "Building height",
+    blurb: "The tallest completed skyscrapers on the planet.",
+    topic: "Society",
+    source: "wikidata",
+    params: {
+      labelVar: "itemLabel",
+      valueVar: "height",
+      entityNoun: "buildings",
+      query:
+        'SELECT ?itemLabel ?height WHERE { ?item wdt:P31/wdt:P279* wd:Q11303 . ?item wdt:P2048 ?height . SERVICE wikibase:label { bd:serviceParam wikibase:language "en". } } ORDER BY DESC(?height) LIMIT 20',
+    },
+    defaultChart: "rankedBar",
+    unit: "m",
+    additive: false,
+  },
+
+  // ── Our World in Data (more topics) ─────────────────────────────────────
+  {
+    id: "owid-meat",
+    title: "Who eats the most meat",
+    metric: "Meat supply per person",
+    blurb: "Kilograms of meat per person per year.",
+    topic: "Society",
+    source: "owid",
+    params: { slug: "meat-supply-per-person" },
+    defaultChart: "rankedBar",
+    unit: "kg/person/yr",
+    additive: false,
+  },
+  {
+    id: "owid-happiness",
+    title: "The happiest countries",
+    metric: "Self-reported life satisfaction",
+    blurb: "Average happiness on the 0–10 Cantril ladder.",
+    topic: "Society",
+    source: "owid",
+    params: { slug: "happiness-cantril-landings" },
+    defaultChart: "rankedBar",
+    unit: "score /10",
+    additive: false,
+  },
+  {
+    id: "owid-obesity",
+    title: "Where obesity is highest",
+    metric: "Adult obesity rate",
+    blurb: "Share of adults classified as obese.",
+    topic: "Health",
+    source: "owid",
+    params: { slug: "share-of-adults-defined-as-obese" },
+    defaultChart: "rankedBar",
+    unit: "%",
+    additive: false,
+  },
+
+  // ── World Bank (more topics) ────────────────────────────────────────────
+  {
+    id: "wb-internet",
+    title: "Who's online",
+    metric: "Individuals using the internet (%)",
+    blurb: "Share of the population using the internet.",
+    topic: "Technology",
+    source: "worldbank",
+    params: { indicator: "IT.NET.USER.ZS" },
+    defaultChart: "rankedBar",
+    unit: "%",
+    additive: false,
+  },
+  {
+    id: "wb-forest",
+    title: "The most forested countries",
+    metric: "Forest area (% of land)",
+    blurb: "Share of land covered by forest.",
+    topic: "Environment",
+    source: "worldbank",
+    params: { indicator: "AG.LND.FRST.ZS" },
+    defaultChart: "rankedBar",
+    unit: "%",
+    additive: false,
+  },
+  {
+    id: "wb-urban",
+    title: "The most urban countries",
+    metric: "Urban population (%)",
+    blurb: "Share of people living in cities and towns.",
+    topic: "Population",
+    source: "worldbank",
+    params: { indicator: "SP.URB.TOTL.IN.ZS" },
+    defaultChart: "rankedBar",
+    unit: "%",
     additive: false,
   },
 ];

@@ -15,15 +15,22 @@ interface RcCountry {
   area?: number;
   population?: number;
   borders?: string[];
+  timezones?: string[];
+  languages?: Record<string, string>;
 }
 
 const METRICS = {
-  area: { unit: "km²", additive: true, source: "area" },
-  density: { unit: "people/km²", additive: false, source: "density" },
-  borders: { unit: "neighbours", additive: false, source: "borders" },
+  area: { unit: "km²", additive: true },
+  density: { unit: "people/km²", additive: false },
+  borders: { unit: "neighbours", additive: false },
+  timezones: { unit: "time zones", additive: false },
+  languages: { unit: "languages", additive: false },
 } as const;
 
 type MetricKey = keyof typeof METRICS;
+
+// REST Countries fields to request — kept in sync with the metrics above.
+const FIELDS = "name,cca3,area,population,borders,timezones,languages";
 
 function valueFor(c: RcCountry, metric: MetricKey): number | null {
   switch (metric) {
@@ -35,6 +42,10 @@ function valueFor(c: RcCountry, metric: MetricKey): number | null {
         : null;
     case "borders":
       return c.borders ? c.borders.length : 0;
+    case "timezones":
+      return c.timezones ? c.timezones.length : 0;
+    case "languages":
+      return c.languages ? Object.keys(c.languages).length : 0;
   }
 }
 
@@ -48,7 +59,8 @@ function normalize(rows: RcCountry[], entry: CatalogEntry): Series {
     if (!label) continue;
     const value = valueFor(c, metric);
     if (value == null || !Number.isFinite(value)) continue;
-    if (metric === "borders" && value === 0) continue; // skip island nations
+    // Skip zero-count rows (e.g. island nations have no land borders).
+    if ((metric === "borders" || metric === "languages") && value === 0) continue;
     points.push({ label, id: c.cca3, value, year: undefined });
   }
 
@@ -70,7 +82,7 @@ export const restCountries: SourceAdapter = {
     try {
       // The /all endpoint requires an explicit field list.
       const rows = await fetchJson<RcCountry[]>(
-        "https://restcountries.com/v3.1/all?fields=name,cca3,area,population,borders",
+        `https://restcountries.com/v3.1/all?fields=${FIELDS}`,
       );
       if (!Array.isArray(rows)) throw new Error("REST Countries: unexpected shape");
       return normalize(rows, entry);

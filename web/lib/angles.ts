@@ -44,12 +44,13 @@ function rankingAngles(series: Series): Angle[] {
   const leader = pts[0];
   const runner = pts[1];
   const unit = series.unit;
+  const noun = series.entityNoun ?? "countries";
 
   // 1) The straightforward ranking.
   angles.push({
     id: "top10",
     label: "Top 10 ranking",
-    headline: `The top ${clampTop(10, pts.length)} countries by ${shortTitle(series)}`,
+    headline: `The top ${clampTop(10, pts.length)} ${noun} by ${shortTitle(series)}`,
     detail: `${leader.label} leads with ${formatValue(leader.value, unit)}.`,
     topN: clampTop(10, pts.length),
   });
@@ -79,7 +80,7 @@ function rankingAngles(series: Series): Angle[] {
       angles.push({
         id: "concentration",
         label: "How concentrated?",
-        headline: `Just ${topN} countries hold ${share}% of ${shortTitle(series)}`,
+        headline: `Just ${topN} ${noun} hold ${share}% of ${shortTitle(series)}`,
         detail: `The top ${topN} account for ${share}% of the total across the ${pts.length} shown.`,
         topN: clampTop(10, pts.length),
       });
@@ -177,6 +178,7 @@ export function shortTitle(series: Series): string {
   if (has("wage")) return "minimum wage";
   if (has("electricity price", "power price")) return "electricity prices";
   if (has("density")) return "population density";
+  if (has("forest")) return "forest cover"; // before "area" ("forest area")
   if (has("land area", "area")) return "land area";
   if (has("border", "neighbour")) return "neighbours";
   if (has("r&d", "research")) return "R&D spending";
@@ -185,6 +187,16 @@ export function shortTitle(series: Series): string {
   if (has("federal funds", "funds rate", "interest")) return "interest rates";
   if (has("s&p", "stock")) return "the S&P 500";
   if (has("wind", "solar", "renewable")) return "wind & solar power";
+  if (has("heritage")) return "World Heritage sites";
+  if (has("nobel")) return "Nobel laureates";
+  if (has("building", "skyscraper", "height", "tall")) return "height";
+  if (has("time zone", "timezone")) return "time zones";
+  if (has("language")) return "official languages";
+  if (has("meat")) return "meat eaten per person";
+  if (has("happiness", "cantril", "life satisfaction")) return "happiness";
+  if (has("obes")) return "obesity";
+  if (has("forest")) return "forest cover";
+  if (has("urban")) return "urbanisation";
   if (has("internet")) return "internet use";
   if (has("co₂", "co2")) return has("per cap") ? "CO₂ per person" : "CO₂ emissions";
   if (has("life expectancy")) return "life expectancy";

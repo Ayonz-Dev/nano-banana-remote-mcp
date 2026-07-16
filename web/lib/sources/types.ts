@@ -37,6 +37,12 @@ export interface Series {
    * and line rendering instead of country rankings.
    */
   temporal?: boolean;
+  /**
+   * Plural noun for the ranked entities, used in headlines. Defaults to
+   * "countries"; set e.g. "buildings" or "cities" when a source ranks something
+   * other than countries.
+   */
+  entityNoun?: string;
   /** True when served from bundled fixtures because live fetch was unavailable. */
   fromFixture?: boolean;
 }
@@ -72,7 +78,8 @@ export type Topic =
   | "Health"
   | "Energy"
   | "Geography"
-  | "Society";
+  | "Society"
+  | "Culture";
 
 export type SourceId =
   | "worldbank"
@@ -81,7 +88,8 @@ export type SourceId =
   | "fred"
   | "imf"
   | "restcountries"
-  | "eurostat";
+  | "eurostat"
+  | "wikidata";
 
 export interface SourceAdapter {
   id: SourceId;
