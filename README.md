@@ -1,5 +1,13 @@
 # Nano Banana — Remote MCP Server
 
+> **Also in this repo:** [`web/`](web/) — **DataForge Studio**, a standalone
+> Next.js app that turns public datasets into precise, branded, social-ready
+> charts and captions (a Voronoi-style content engine). See
+> [`web/README.md`](web/README.md).
+
+---
+
+
 A small remote MCP server that exposes Gemini image generation/editing as a
 **custom connector** you can add to Claude on **web, mobile, and desktop** — so
 it works in *every* chat, not just on one PC.
