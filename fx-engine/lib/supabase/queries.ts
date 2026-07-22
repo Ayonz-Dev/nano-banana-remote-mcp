@@ -1,7 +1,7 @@
 import 'server-only';
 import { getServerClient } from './server';
 import type { CashRow, CoverageRow, Scenario } from '../coverage/types';
-import type { ForecastPoint, ForwardPoint, SpotPoint } from '../chart/series';
+import type { ForecastBandPoint, ForecastPoint, ForwardPoint, SpotPoint } from '../chart/series';
 
 // Data access for the dashboard. All numeric columns come back from supabase-js
 // as strings to preserve precision, so every fetch coerces them to numbers here,
@@ -130,6 +130,24 @@ export async function fetchForwards(
     date: row.maturity_date as string,
     rate: num(row.contract_rate),
     orderNumber: row.order_number as string,
+  }));
+}
+
+/** Latest model spot forecast per pair, with the uncertainty band. */
+export async function fetchSpotForecasts(pair: string): Promise<ForecastBandPoint[]> {
+  const client = getServerClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('v_spot_forecast_latest')
+    .select('target_date, forecast_rate, lower_rate, upper_rate')
+    .eq('pair', pair)
+    .order('target_date', { ascending: true });
+  if (error) throw new Error(`fetchSpotForecasts: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    date: row.target_date as string,
+    rate: num(row.forecast_rate),
+    lower: num(row.lower_rate),
+    upper: num(row.upper_rate),
   }));
 }
 

@@ -26,6 +26,7 @@ without disturbing the Nano Banana MCP server that shares this repository root.
 | `003_hedge_coverage_monthly.sql` | `v_hedge_coverage_monthly` (the single source the KPI cards read) and `v_cash_latest`. |
 | `004_soft_delete_reconciliation.sql` | `status`, `source`, `import_batch_id`, `updated_at`, `retired_at` on `forward_orders`; `updated_at` trigger; refreshes the coverage view to ignore retired rows; n8n reconciliation DML as a commented template. |
 | `005_rate_assumptions.sql` | `rate_assumptions` config table plus `v_rate_assumptions_latest`. The interest-rate differential source for the IRP line. |
+| `006_spot_forecasts.sql` | `spot_forecasts` table (model forecast with an uncertainty band) plus `v_spot_forecast_latest`, the source for the model forecast line. |
 
 ### IRP predictive line (`lib/irp`)
 
@@ -45,6 +46,25 @@ F = S * (1 + r_quote * t) / (1 + r_base * t)
 The differential comes from the `rate_assumptions` table (decision recorded in
 the brief). The library stays pure and receives resolved rates; wire the app so
 it reads `v_rate_assumptions_latest` and passes the rates in.
+
+### Model spot forecast (`lib/forecast`)
+
+A native numeric forecast, so the chart has a forecast line without depending on
+an external trading agent. A pure, unit-tested unit:
+
+- `dampedHolt.ts`: damped-trend exponential smoothing. A random walk is hard to
+  beat on FX and an undamped trend runs away, so the trend is damped and settles
+  over the horizon. It emits a central point and an ~80 per cent uncertainty
+  band that widens with the square root of the horizon.
+- `fromSpot.ts`: adapts a dated spot series to dated monthly forecast points
+  with the band, mapping calendar dates to fractional model steps.
+- This is model opinion, not arbitrage-free maths. It is always drawn with its
+  band and a distinct label so it never reads like the IRP line.
+
+`scripts/generate-forecasts.ts` (run `npm run forecast`) reads `spot_history`,
+fits the model per active pair, and upserts a run into `spot_forecasts`. Schedule
+it daily (n8n, cron) after new spot data lands. The chart reads the latest run
+from `v_spot_forecast_latest`.
 
 ### Dashboard (Next.js App Router)
 
@@ -69,10 +89,11 @@ it reads `v_rate_assumptions_latest` and passes the rates in.
   axis, with a slider for the manual line.
 - `lib/chart/series.ts` builds the model as a pure, unit-tested unit. Every
   predictive line is anchored on the last actual spot so they converge there.
-- The three predictive lines carry different epistemic status and get distinct
-  dash styles and legend labels so they do not read as equally authoritative:
-  IRP (arbitrage-free, clean dash), bank forecast (opinion, sparse dot), manual
-  (what-if, dash-dot).
+- Four predictive lines carry different epistemic status and get distinct dash
+  styles and legend labels so they do not read as equally authoritative: IRP
+  (arbitrage-free, clean dash), bank forecast (opinion, sparse dot), manual
+  (what-if, dash-dot), and the model forecast (damped Holt, fine dots) with a
+  shaded uncertainty band.
 - Manual slider behaviour: it shifts the endpoint rate at the far horizon and
   interpolates linearly back to the anchor spot, rather than a flat drift.
 - IRP rates come from `rate_assumptions` via `ratesForPair`. The default pair is

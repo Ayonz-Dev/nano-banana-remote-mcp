@@ -1,5 +1,6 @@
 import { RateChart } from '../../components/RateChart';
 import type { ForecastPoint, ForwardPoint, SpotPoint } from '../../lib/chart/series';
+import { forecastFromSpot } from '../../lib/forecast';
 
 // Deterministic synthetic data so the chart renders and can be verified without
 // a database. Not linked from the app; it is a development and screenshot aid.
@@ -34,6 +35,8 @@ const forwards: ForwardPoint[] = [
 ];
 
 export default function ChartPreviewPage() {
+  const spot = syntheticSpot();
+  const modelForecasts = forecastFromSpot(spot, { horizonMonths: 12 });
   return (
     <main className="page">
       <header className="page-head">
@@ -42,8 +45,9 @@ export default function ChartPreviewPage() {
       </header>
       <RateChart
         pair="AUD/USD"
-        spotHistory={syntheticSpot()}
+        spotHistory={spot}
         bankForecasts={bankForecasts}
+        modelForecasts={modelForecasts}
         forwards={forwards}
         rateBase={AUD}
         rateQuote={USD}

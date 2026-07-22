@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import {
   ComposedChart,
   Line,
+  Area,
   Scatter,
   XAxis,
   YAxis,
@@ -15,6 +16,7 @@ import {
 import {
   buildChartModel,
   type ForecastPoint,
+  type ForecastBandPoint,
   type ForwardPoint,
   type SpotPoint,
 } from '../lib/chart/series';
@@ -24,6 +26,7 @@ export interface RateChartProps {
   pair: string;
   spotHistory: SpotPoint[];
   bankForecasts: ForecastPoint[];
+  modelForecasts?: ForecastBandPoint[];
   forwards: ForwardPoint[];
   rateBase: number;
   rateQuote: number;
@@ -38,6 +41,7 @@ const STROKE = {
   irp: '#60a5fa',
   bank: '#fbbf24',
   manual: '#f472b6',
+  forecast: '#a78bfa',
   forward: '#4ade80',
 };
 
@@ -45,6 +49,7 @@ export function RateChart({
   pair,
   spotHistory,
   bankForecasts,
+  modelForecasts = [],
   forwards,
   rateBase,
   rateQuote,
@@ -62,13 +67,14 @@ export function RateChart({
       buildChartModel({
         spotHistory,
         bankForecasts,
+        modelForecasts,
         forwards,
         rateBase,
         rateQuote,
         manualEndpointRate,
         horizonMonths,
       }),
-    [spotHistory, bankForecasts, forwards, rateBase, rateQuote, manualEndpointRate, horizonMonths],
+    [spotHistory, bankForecasts, modelForecasts, forwards, rateBase, rateQuote, manualEndpointRate, horizonMonths],
   );
 
   const scatterData = useMemo(
@@ -93,9 +99,10 @@ export function RateChart({
 
   const ys: number[] = [];
   for (const r of model.rows) {
-    for (const v of [r.spot, r.irp, r.bank, r.manual]) {
+    for (const v of [r.spot, r.irp, r.bank, r.manual, r.forecast]) {
       if (v != null) ys.push(v);
     }
+    if (r.forecastBand) ys.push(r.forecastBand[0], r.forecastBand[1]);
   }
   for (const f of scatterData) ys.push(f.forward);
   const yLow = Math.min(...ys);
@@ -155,6 +162,17 @@ export function RateChart({
             }
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Area
+            type="monotone"
+            dataKey="forecastBand"
+            name="Model forecast band"
+            stroke="none"
+            fill={STROKE.forecast}
+            fillOpacity={0.14}
+            connectNulls
+            isAnimationActive={false}
+            activeDot={false}
+          />
           <Line
             type="monotone"
             dataKey="spot"
@@ -194,6 +212,17 @@ export function RateChart({
             stroke={STROKE.manual}
             strokeWidth={2}
             strokeDasharray="8 3 2 3"
+            dot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+          <Line
+            type="monotone"
+            dataKey="forecast"
+            name="Model forecast (damped Holt)"
+            stroke={STROKE.forecast}
+            strokeWidth={2}
+            strokeDasharray="1 3"
             dot={false}
             connectNulls
             isAnimationActive={false}

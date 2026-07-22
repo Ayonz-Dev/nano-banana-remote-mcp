@@ -11,6 +11,7 @@ import {
   fetchBankForecasts,
   fetchForwards,
   fetchRateAssumptions,
+  fetchSpotForecasts,
 } from '../lib/supabase/queries';
 import {
   rollupCoverage,
@@ -62,13 +63,14 @@ export default async function DashboardPage({
     );
   }
 
-  const [scenarios, coverage, cash, spotHistory, bankForecasts, forwards, rateMap] =
+  const [scenarios, coverage, cash, spotHistory, bankForecasts, modelForecasts, forwards, rateMap] =
     await Promise.all([
       fetchScenarios(),
       fetchCoverage(scenarioId),
       fetchCash(scenarioId),
       fetchSpotHistory(CHART_PAIR),
       fetchBankForecasts(CHART_PAIR),
+      fetchSpotForecasts(CHART_PAIR),
       fetchForwards(scenarioId, CHART_PAIR),
       fetchRateAssumptions(),
     ]);
@@ -131,6 +133,7 @@ export default async function DashboardPage({
           pair={CHART_PAIR}
           spotHistory={spotHistory}
           bankForecasts={bankForecasts}
+          modelForecasts={modelForecasts}
           forwards={forwards}
           rateBase={chartRates.rateBase}
           rateQuote={chartRates.rateQuote}

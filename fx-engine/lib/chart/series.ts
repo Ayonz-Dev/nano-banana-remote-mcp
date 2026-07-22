@@ -22,6 +22,14 @@ export interface ForecastPoint {
   rate: number;
 }
 
+/** Model forecast point with an uncertainty band. */
+export interface ForecastBandPoint {
+  date: string;
+  rate: number;
+  lower: number;
+  upper: number;
+}
+
 export interface ForwardPoint {
   date: string;
   rate: number;
@@ -36,11 +44,16 @@ export interface ChartRow {
   irp: number | null;
   bank: number | null;
   manual: number | null;
+  /** Central model forecast. */
+  forecast: number | null;
+  /** Forecast band as [lower, upper] for a range area, or null. */
+  forecastBand: [number, number] | null;
 }
 
 export interface BuildChartParams {
   spotHistory: SpotPoint[];
   bankForecasts: ForecastPoint[];
+  modelForecasts?: ForecastBandPoint[];
   forwards?: ForwardPoint[];
   /** Annualised rate of the base currency, decimal. */
   rateBase: number;
@@ -99,17 +112,31 @@ export function buildChartModel(params: BuildChartParams): ChartModel {
   for (const f of forwards) {
     if (parseIso(f.date) > anchorMs) futureDates.add(f.date);
   }
+  const modelForecasts = params.modelForecasts ?? [];
+  for (const m of modelForecasts) {
+    if (parseIso(m.date) > anchorMs) futureDates.add(m.date);
+  }
 
   const horizonMs = [...futureDates].reduce((max, d) => Math.max(max, parseIso(d)), anchorMs);
   const span = horizonMs - anchorMs || 1;
   const bankMap = new Map(params.bankForecasts.map((b) => [b.date, b.rate]));
+  const forecastMap = new Map(modelForecasts.map((m) => [m.date, m]));
 
   const rows: ChartRow[] = [];
 
   // Past actuals: spot only.
   for (const s of spot) {
     if (s.date === anchor.date) continue;
-    rows.push({ date: s.date, t: parseIso(s.date), spot: s.rate, irp: null, bank: null, manual: null });
+    rows.push({
+      date: s.date,
+      t: parseIso(s.date),
+      spot: s.rate,
+      irp: null,
+      bank: null,
+      manual: null,
+      forecast: null,
+      forecastBand: null,
+    });
   }
 
   // Anchor row: every predictive line converges on the last actual spot.
@@ -120,6 +147,8 @@ export function buildChartModel(params: BuildChartParams): ChartModel {
     irp: anchor.rate,
     bank: anchor.rate,
     manual: anchor.rate,
+    forecast: anchor.rate,
+    forecastBand: [anchor.rate, anchor.rate],
   });
 
   // Future rows: predictive lines only.
@@ -135,7 +164,17 @@ export function buildChartModel(params: BuildChartParams): ChartModel {
     const fraction = (dMs - anchorMs) / span;
     const manual = anchor.rate + (params.manualEndpointRate - anchor.rate) * fraction;
     const bank = bankMap.has(date) ? bankMap.get(date)! : null;
-    rows.push({ date, t: dMs, spot: null, irp, bank, manual });
+    const fc = forecastMap.get(date);
+    rows.push({
+      date,
+      t: dMs,
+      spot: null,
+      irp,
+      bank,
+      manual,
+      forecast: fc ? fc.rate : null,
+      forecastBand: fc ? [fc.lower, fc.upper] : null,
+    });
   }
 
   rows.sort((a, b) => a.t - b.t);
